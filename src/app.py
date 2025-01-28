@@ -1,9 +1,18 @@
 from flask import Flask, request, Response
 from utils import get_gpt_response, mark_as_read, send_reply
 from constants import WEBHOOK_VERIFY_TOKEN
+from redis import Redis
 import json
+import os
 
 app = Flask(__name__)
+
+redis_client = Redis(
+    host=os.getenv("REDIS_HOST", "localhost"),
+    port=os.getenv("REDIS_PORT", 6379),
+    db=0,
+    decode_responses=True,
+)
 
 
 @app.get("/webhook")
@@ -41,13 +50,25 @@ def webhook():
         sender_phone_number = message["from"]
         message_id = message["id"]
 
-        message_history = []
+        history_key = f"chat:history:{sender_phone_number}"
+        conversation_json = redis_client.get(history_key)
 
-        gpt_reply = get_gpt_response(message_history)
+        if conversation_json:
+            messages_history = json.loads(conversation_json)
+        else:
+            messages_history = []
+
+        messages_history.append({"role": "user", "content": user_message})
+
+        gpt_reply = get_gpt_response(messages_history)
+
+        messages_history.append({"role": "assistant", "content": gpt_reply})
 
         send_reply(sender_phone_number, gpt_reply, message_id)
         mark_as_read(message_id)
 
+        redis_client.set(history_key, json.dumps(messages_history))
+
     except Exception as e:
         print(f"Error processing webhook: {str(e)}")
-        return {"error": str(e)}, 500
+        return {"error": str(e)}, 50
