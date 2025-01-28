@@ -1,0 +1,18 @@
+# Ignore .env files
+.env
+.env.*
+
+# Ignore Python virtual environments
+venv/
+env/
+*.venv/
+
+# Ignore common virtual environment directories
+ENV/
+.virtualenv/
+
+# macOS files (optional, commonly added)
+.DS_Store
+
+# Windows files (optional, commonly added)
+Thumbs.db
