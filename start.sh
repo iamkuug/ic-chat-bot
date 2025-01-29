@@ -5,4 +5,4 @@ source venv/bin/activate
 
 pip install -r requirements.txt
 
-flask run
+python src/app.py

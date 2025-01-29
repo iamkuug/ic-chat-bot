@@ -2,6 +2,7 @@ from flask import Flask, request, Response
 from utils.get_gpt_response import *
 from utils.mark_as_read import *
 from utils.send_reply import *
+from utils.check_env_status import *
 from constants import WEBHOOK_VERIFY_TOKEN
 from redis import Redis
 from dotenv import load_dotenv
@@ -9,6 +10,8 @@ import json
 import os
 
 load_dotenv()
+check_env_status()
+
 app = Flask(__name__)
 
 redis_client = Redis(
@@ -19,6 +22,15 @@ redis_client = Redis(
     db=0,
     decode_responses=True,
 )
+
+
+@app.route("/", methods=["GET"])
+def health():
+    try:
+        redis_client.ping()
+        return {"status": "healthy", "redis": "connected"}, 200
+    except Exception as e:
+        return {"status": "unhealthy", "redis": str(e)}, 500
 
 
 @app.get("/webhook")
@@ -78,6 +90,8 @@ def webhook():
         mark_as_read(message_id)
 
         redis_client.set(history_key, json.dumps(messages_history))
+
+        return Response("success", 200)
 
     except Exception as e:
         print(f"Error processing webhook: {str(e)}")
