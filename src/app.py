@@ -81,7 +81,7 @@ def webhook():
 
     except Exception as e:
         print(f"Error processing webhook: {str(e)}")
-        return {"error": str(e)}, 500
+        return Response(str(e), 500)
 
 
 if __name__ == "__main__":
