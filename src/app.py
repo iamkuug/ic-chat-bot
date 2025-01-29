@@ -2,14 +2,18 @@ from flask import Flask, request, Response
 from utils import get_gpt_response, mark_as_read, send_reply
 from constants import WEBHOOK_VERIFY_TOKEN
 from redis import Redis
+from dotenv import load_dotenv
 import json
 import os
 
+load_dotenv()
 app = Flask(__name__)
 
 redis_client = Redis(
     host=os.getenv("REDIS_HOST", "localhost"),
     port=os.getenv("REDIS_PORT", 6379),
+    password=os.getenv("REDIS_PASSWORD", ""),
+    username="default",
     db=0,
     decode_responses=True,
 )
