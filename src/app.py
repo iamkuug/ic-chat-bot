@@ -76,3 +76,7 @@ def webhook():
     except Exception as e:
         print(f"Error processing webhook: {str(e)}")
         return {"error": str(e)}, 50
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=os.getenv("PORT"))
