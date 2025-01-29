@@ -1,5 +1,7 @@
 from flask import Flask, request, Response
-from utils import get_gpt_response, mark_as_read, send_reply
+from utils.get_gpt_response import *
+from utils.mark_as_read import *
+from utils.send_reply import *
 from constants import WEBHOOK_VERIFY_TOKEN
 from redis import Redis
 from dotenv import load_dotenv
@@ -64,9 +66,13 @@ def webhook():
 
         messages_history.append({"role": "user", "content": user_message})
 
-        gpt_reply = get_gpt_response(messages_history)
+        gpt_reply = get_chatgpt_response(messages_history)
+
+        print(gpt_reply)
 
         messages_history.append({"role": "assistant", "content": gpt_reply})
+
+        print(messages_history)
 
         send_reply(sender_phone_number, gpt_reply, message_id)
         mark_as_read(message_id)
@@ -75,7 +81,7 @@ def webhook():
 
     except Exception as e:
         print(f"Error processing webhook: {str(e)}")
-        return {"error": str(e)}, 50
+        return {"error": str(e)}, 500
 
 
 if __name__ == "__main__":
