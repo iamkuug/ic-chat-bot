@@ -3,6 +3,7 @@ from utils.get_gpt_response import *
 from utils.mark_as_read import *
 from utils.send_reply import *
 from utils.check_env_status import *
+from utils.logger import *
 from constants import WEBHOOK_VERIFY_TOKEN
 from redis import Redis
 from dotenv import load_dotenv
@@ -11,6 +12,7 @@ import os
 
 load_dotenv()
 check_env_status()
+
 
 app = Flask(__name__)
 
@@ -40,10 +42,10 @@ def verify_webhook():
     challenge = request.args.get("hub.challenge")
 
     if mode == "subscribe" and token == WEBHOOK_VERIFY_TOKEN:
-        print("Webhook verified successfully!")
+        logger.info("Webhook verified successfully!")
         return Response(challenge, status=200)
     else:
-        print("Webhook verification failed. Invalid token or mode.")
+        logger.info("Webhook verification failed. Invalid token or mode.")
         return Response(status=403)
 
 
@@ -61,8 +63,8 @@ def webhook():
         )
 
         if message.get("type") != "text":
-            print("No text found in webhook payload")
-            return
+            logger.info("No text found in webhook payload, (Wrong subscription)")
+            return None, 400
 
         user_message = message["text"]["body"]
         sender_phone_number = message["from"]
@@ -80,11 +82,7 @@ def webhook():
 
         gpt_reply = get_chatgpt_response(messages_history)
 
-        print(gpt_reply)
-
         messages_history.append({"role": "assistant", "content": gpt_reply})
-
-        print(messages_history)
 
         send_reply(sender_phone_number, gpt_reply, message_id)
         mark_as_read(message_id)
@@ -94,7 +92,7 @@ def webhook():
         return Response("success", 200)
 
     except Exception as e:
-        print(f"Error processing webhook: {str(e)}")
+        logger.info(f"Error processing webhook: {str(e)}")
         return Response(str(e), 500)
 
 

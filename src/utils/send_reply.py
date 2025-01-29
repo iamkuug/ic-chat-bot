@@ -1,4 +1,5 @@
 from constants import GRAPH_API_TOKEN, PHONE_NUMBER_ID
+from utils.logger import *
 import requests
 
 
@@ -18,10 +19,10 @@ def send_reply(to: str, reply: str, message_id: str) -> None:
             },
         )
         response.raise_for_status()
-        print(f"Sent reply to {to}: {reply}")
+        logger.info(f"Sent reply to {to}: {reply}")
 
     except requests.exceptions.RequestException as error:
         error_message = (
             error.response.json() if hasattr(error, "response") else str(error)
         )
-        print(f"Error sending message via WhatsApp API: {error_message}")
+        logger.error(f"Error sending message via WhatsApp API: {error_message}")

@@ -1,4 +1,5 @@
 from constants import SYSTEM_PROMPT, OPENAI_API_KEY
+from utils.logger import *
 import requests
 
 
@@ -28,5 +29,5 @@ def get_chatgpt_response(messages: list[str]) -> str:
         error_message = (
             error.response.json() if hasattr(error, "response") else str(error)
         )
-        print(f"Error communicating with OpenAI: {error_message}")
+        logger.error(f"Error communicating with OpenAI: {error_message}")
         return "Sorry, I am unable to process your request at the moment."
