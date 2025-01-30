@@ -63,7 +63,7 @@ def webhook():
 
         if message.get("type") != "text":
             logger.info("No text found in webhook payload (ignore)")
-            return Response({"msg": "No text found (ignore)"}, 400)
+            return Response({"msg": "No text found (ignore)"}, 200)
 
         print("Incoming webhook message:", message)
 
