@@ -51,7 +51,6 @@ def verify_webhook():
 
 @app.post("/webhook")
 def webhook():
-    print("Incoming webhook message:", json.dumps(request.json, indent=2))
 
     try:
         body = request.json
@@ -63,8 +62,10 @@ def webhook():
         )
 
         if message.get("type") != "text":
-            logger.info("No text found in webhook payload, (Wrong subscription)")
-            return None, 400
+            logger.info("No text found in webhook payload (ignore)")
+            return Response({"msg": "No text found (ignore)"}, 400)
+
+        print("Incoming webhook message:", json.dumps(request.json, indent=2))
 
         user_message = message["text"]["body"]
         sender_phone_number = message["from"]
