@@ -1,13 +1,13 @@
-from flask import Flask, request, Response
-from utils.get_gpt_response import *
+from flask import Flask, request, Response, g
 from utils.mark_as_read import *
 from utils.send_reply import *
 from utils.check_env_status import *
 from utils.logger import *
-from constants import WEBHOOK_VERIFY_TOKEN
+from utils.openai import *
+from constants import WEBHOOK_VERIFY_TOKEN, OPENAI_ASSISTANT_ID
 from redis import Redis
 from dotenv import load_dotenv
-import json
+import time
 import os
 
 load_dotenv()
@@ -15,6 +15,25 @@ check_env_status()
 
 
 app = Flask(__name__)
+
+
+@app.before_request
+def start_timer():
+    """Store the start time before handling the request."""
+    g.start_time = time.time()
+
+
+@app.after_request
+def log_request_time(response):
+    """Calculate and log the request execution time after processing."""
+    if hasattr(g, "start_time"):
+        execution_time = time.time() - g.start_time
+        logger.warning(
+            f"Request to {request.path} took {execution_time:.4f} seconds"
+        )
+
+    return response
+
 
 redis_client = Redis(
     host=os.getenv("REDIS_HOST", "localhost"),
@@ -42,10 +61,10 @@ def verify_webhook():
     challenge = request.args.get("hub.challenge")
 
     if mode == "subscribe" and token == WEBHOOK_VERIFY_TOKEN:
-        logger.info("Webhook verified successfully!")
+        logger.debug("Webhook verified successfully!")
         return Response(challenge, status=200)
     else:
-        logger.info("Webhook verification failed. Invalid token or mode.")
+        logger.error("Webhook verification failed. Invalid token or mode.")
         return Response(status=403)
 
 
@@ -65,36 +84,31 @@ def webhook():
             logger.info("No text found in webhook payload (ignore)")
             return Response({"msg": "No text found (ignore)"}, 200)
 
-        logger.info("Incoming webhook message:")
-        logger.info(message)
+        logger.debug(f"Incoming webhook message: {message}")
 
         user_message = message["text"]["body"]
         sender_phone_number = message["from"]
         message_id = message["id"]
 
-        history_key = f"chat:history:{sender_phone_number}"
-        conversation_json = redis_client.get(history_key)
+        thread_key = f"thread:{sender_phone_number}"
+        thread_id = redis_client.get(thread_key)
 
-        if conversation_json:
-            messages_history = json.loads(conversation_json)
-        else:
-            messages_history = []
+        if not thread_id:
+            thread = gpt_client.beta.threads.create()
+            thread_id = thread.id
+            redis_client.set(thread_key, thread_id)
 
-        messages_history.append({"role": "user", "content": user_message})
+        add_response_to_thread(thread_id, user_message)
 
-        gpt_reply = get_chatgpt_response(messages_history)
-
-        messages_history.append({"role": "assistant", "content": gpt_reply})
+        gpt_reply = get_chatgpt_response(thread_id, OPENAI_ASSISTANT_ID)
 
         send_reply(sender_phone_number, gpt_reply, message_id)
         mark_as_read(message_id)
 
-        redis_client.set(history_key, json.dumps(messages_history))
-
         return Response("success", 200)
 
     except Exception as e:
-        logger.info(f"Error processing webhook: {str(e)}")
+        logger.error(f"Error processing webhook: {str(e)}")
         return Response(str(e), 500)
 
 

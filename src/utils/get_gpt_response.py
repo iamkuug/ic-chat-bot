@@ -3,6 +3,7 @@ from utils.logger import *
 import requests
 
 
+# @Depracated
 def get_chatgpt_response(messages: list[str]) -> str:
     try:
         full_messages = [SYSTEM_PROMPT] + messages

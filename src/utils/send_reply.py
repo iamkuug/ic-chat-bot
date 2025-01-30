@@ -19,7 +19,7 @@ def send_reply(to: str, reply: str, message_id: str) -> None:
             },
         )
         response.raise_for_status()
-        logger.info(f"Sent reply to {to}: {reply}")
+        logger.debug(f"Sent reply to {to}: {reply}")
 
     except requests.exceptions.RequestException as error:
         error_message = (

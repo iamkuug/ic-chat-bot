@@ -18,7 +18,7 @@ def mark_as_read(message_id: str) -> None:
             },
         )
         response.raise_for_status()
-        logger.info(f"Marked message {message_id} as read.")
+        logger.debug(f"Marked message {message_id} as read.")
 
     except requests.exceptions.RequestException as error:
         error_message = (
