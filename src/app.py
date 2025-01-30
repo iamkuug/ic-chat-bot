@@ -65,7 +65,7 @@ def webhook():
             logger.info("No text found in webhook payload (ignore)")
             return Response({"msg": "No text found (ignore)"}, 400)
 
-        print("Incoming webhook message:", json.dumps(request.json, indent=2))
+        print("Incoming webhook message:", message)
 
         user_message = message["text"]["body"]
         sender_phone_number = message["from"]
