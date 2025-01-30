@@ -1,5 +1,6 @@
 from flask import Flask, request, Response, g
 from utils.mark_as_read import *
+from utils.profiler import *
 from utils.send_reply import *
 from utils.check_env_status import *
 from utils.logger import *
@@ -28,9 +29,7 @@ def log_request_time(response):
     """Calculate and log the request execution time after processing."""
     if hasattr(g, "start_time"):
         execution_time = time.time() - g.start_time
-        logger.warning(
-            f"Request to {request.path} took {execution_time:.4f} seconds"
-        )
+        logger.warning(f"Request to {request.path} took {execution_time:.4f} seconds")
 
     return response
 
@@ -70,6 +69,7 @@ def verify_webhook():
 
 @app.post("/webhook")
 def webhook():
+    profiler = RequestProfiler()
 
     try:
         body = request.json
@@ -90,20 +90,36 @@ def webhook():
         sender_phone_number = message["from"]
         message_id = message["id"]
 
-        thread_key = f"thread:{sender_phone_number}"
-        thread_id = redis_client.get(thread_key)
+        # thread_key = f"thread:{sender_phone_number}"
+        # thread_id = redis_client.get(thread_key)
 
-        if not thread_id:
-            thread = gpt_client.beta.threads.create()
-            thread_id = thread.id
-            redis_client.set(thread_key, thread_id)
+        # if not thread_id:
+        #     thread = gpt_client.beta.threads.create()
+        #     thread_id = thread.id
+        #     redis_client.set(thread_key, thread_id)
 
-        add_response_to_thread(thread_id, user_message)
+        # add_response_to_thread(thread_id, user_message)
 
-        gpt_reply = get_chatgpt_response(thread_id, OPENAI_ASSISTANT_ID)
+        # gpt_reply = get_chatgpt_response(thread_id, OPENAI_ASSISTANT_ID)
 
-        send_reply(sender_phone_number, gpt_reply, message_id)
-        mark_as_read(message_id)
+        # send_reply(sender_phone_number, gpt_reply, message_id)
+        # mark_as_read(message_id)
+
+        with profiler.measure("gpt_response"):
+            thread_key = f"thread:{sender_phone_number}"
+            thread_id = redis_client.get(thread_key)
+            if not thread_id:
+                thread = gpt_client.beta.threads.create()
+                thread_id = thread.id
+                redis_client.set(thread_key, thread_id)
+            add_response_to_thread(thread_id, user_message)
+            gpt_reply = get_chatgpt_response(thread_id, OPENAI_ASSISTANT_ID)
+
+        with profiler.measure("whatsapp_reply"):
+            send_reply(sender_phone_number, gpt_reply, message_id)
+            mark_as_read(message_id)
+
+        profiler.report()
 
         return Response("success", 200)
 
