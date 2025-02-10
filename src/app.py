@@ -5,6 +5,7 @@ from utils.send_reply import *
 from utils.check_env_status import *
 from utils.logger import *
 from utils.openai import *
+from utils.wealth import *
 from constants import WEBHOOK_VERIFY_TOKEN, OPENAI_ASSISTANT_ID
 from redis import Redis
 from dotenv import load_dotenv
@@ -90,21 +91,6 @@ def webhook():
         sender_phone_number = message["from"]
         message_id = message["id"]
 
-        # thread_key = f"thread:{sender_phone_number}"
-        # thread_id = redis_client.get(thread_key)
-
-        # if not thread_id:
-        #     thread = gpt_client.beta.threads.create()
-        #     thread_id = thread.id
-        #     redis_client.set(thread_key, thread_id)
-
-        # add_response_to_thread(thread_id, user_message)
-
-        # gpt_reply = get_chatgpt_response(thread_id, OPENAI_ASSISTANT_ID)
-
-        # send_reply(sender_phone_number, gpt_reply, message_id)
-        # mark_as_read(message_id)
-
         with profiler.measure("gpt_response"):
             thread_key = f"thread:{sender_phone_number}"
             thread_id = redis_client.get(thread_key)
@@ -113,11 +99,27 @@ def webhook():
                 thread_id = thread.id
                 redis_client.set(thread_key, thread_id)
             add_response_to_thread(thread_id, user_message)
-            gpt_reply = get_chatgpt_response(thread_id, OPENAI_ASSISTANT_ID)
+            gpt_reply = json.loads(get_chatgpt_response(thread_id, OPENAI_ASSISTANT_ID))
 
         with profiler.measure("whatsapp_reply"):
-            send_reply(sender_phone_number, gpt_reply, message_id)
-            mark_as_read(message_id)
+
+            message_type = gpt_reply.get("type")
+            message_body = gpt_reply.get("message")
+            stock = gpt_reply.get("stock")
+
+            print(gpt_reply)
+
+            logger.debug(f"Incomming Message type: {message_type}")
+
+            if message_type == "GENERAL":
+                send_reply(sender_phone_number, message_body, message_id)
+                mark_as_read(message_id)
+            else:
+                res = get_wealth_info(sender_phone_number, message_body, message_type, stock)
+                message_body = res.get("data").get("message")
+
+                send_reply(sender_phone_number, message_body, message_id)
+                mark_as_read(message_id)
 
         profiler.report()
 
