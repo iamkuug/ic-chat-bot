@@ -10,7 +10,7 @@ async def get_wealth_info(phone, message, type, stock):
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(
-                "https://4ede-154-161-145-23.ngrok-free.app/api/chats",
+                "https://96c9-154-161-145-23.ngrok-free.app/api/chats",
                 json=payload,
                 headers=headers,
             )
