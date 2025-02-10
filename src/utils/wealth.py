@@ -1,27 +1,22 @@
-import requests
 from utils.logger import *
+import httpx
 
 
-def get_wealth_info(phone, message, type, stock):
-
+async def get_wealth_info(phone, message, type, stock):
     payload = {"phone": phone, "message": message, "type": type, "stock": stock}
     headers = {"Content-Type": "application/json"}
-
     logger.debug(payload)
 
-    try:
-        
-        response = requests.post(
-            "https://4ede-154-161-145-23.ngrok-free.app/api/chats",
-            json=payload,
-            headers=headers,
-        )
-
-        response.raise_for_status()
-
-        logger.debug(response.json())
-        return response.json()
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error sending request: {e}")
-        raise
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                "https://4ede-154-161-145-23.ngrok-free.app/api/chats",
+                json=payload,
+                headers=headers,
+            )
+            response.raise_for_status()
+            response_data = response.json()
+            logger.debug(response_data)
+            return response_data
+        except Exception as error:
+            raise error
