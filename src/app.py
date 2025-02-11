@@ -76,7 +76,7 @@ async def webhook(request: Request):
         thread_id = await redis_client.get(thread_key)
 
         if not thread_id:
-            thread = gpt_client.beta.threads.create()
+            thread = await gpt_client.beta.threads.create()
             thread_id = thread.id
             await redis_client.set(thread_key, thread_id)
 
