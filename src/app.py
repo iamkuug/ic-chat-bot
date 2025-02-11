@@ -96,7 +96,7 @@ async def webhook(request: Request):
             await mark_as_read(message_id)
         else:
             res = await get_wealth_info(
-                sender_phone_number, message_body, message_type, stock
+                sender_phone_number, message_body, message_type, stock, message_id
             )
             message_body = res.get("data").get("message")
             await send_reply(sender_phone_number, message_body, message_id)
