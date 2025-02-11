@@ -20,5 +20,5 @@ async def get_wealth_info(phone, message, type, stock, message_id):
             logger.debug(response_data)
             return response_data
         except Exception as error:
-            await send_reply(phone, "Sorry couldn't retreive info at this time", message_id)
+            # await send_reply(phone, "Sorry couldn't retreive info at this time", message_id)
             raise error
