@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, BackgroundTasks
 from fastapi.responses import JSONResponse
 from utils.mark_as_read import *
 from utils.profiler import *
@@ -30,34 +30,8 @@ redis_client = Redis(
 )
 
 
-@app.get("/")
-async def health():
+async def process_webhook_message(body: dict):
     try:
-        await redis_client.ping()
-        return {"status": "healthy", "redis": "connected"}, 200
-    except Exception as e:
-        return {"status": "unhealthy", "redis": str(e)}, 500
-
-
-@app.get("/webhook")
-def verify_webhook(request: Request):
-    mode = request.args.get("hub.mode")
-    token = request.args.get("hub.verify_token")
-    challenge = request.args.get("hub.challenge")
-
-    if mode == "subscribe" and token == WEBHOOK_VERIFY_TOKEN:
-        logger.debug("Webhook verified successfully!")
-        return Response(challenge, status=200)
-    else:
-        logger.error("Webhook verification failed. Invalid token or mode.")
-        return Response(status=403)
-
-
-@app.post("/webhook")
-async def webhook(request: Request):
-    try:
-        body = await request.json()
-
         message = (
             body.get("entry", [{}])[0]
             .get("changes", [{}])[0]
@@ -66,7 +40,7 @@ async def webhook(request: Request):
         )
 
         if message.get("type") != "text":
-            return Response(content="received, ignoring", status_code=200)
+            return
 
         logger.debug(f"Incoming webhook message: {message}")
         user_message = message["text"]["body"]
@@ -103,8 +77,40 @@ async def webhook(request: Request):
             await send_reply(sender_phone_number, message_body, message_id)
             await mark_as_read(message_id)
 
-        return JSONResponse(content="success", status_code=200)
+    except Exception as e:
+        logger.error(f"Error in background processing: {str(e)}")
 
+
+@app.get("/")
+async def health():
+    try:
+        await redis_client.ping()
+        return {"status": "healthy", "redis": "connected"}, 200
+    except Exception as e:
+        return {"status": "unhealthy", "redis": str(e)}, 500
+
+
+@app.get("/webhook")
+def verify_webhook(request: Request):
+    mode = request.args.get("hub.mode")
+    token = request.args.get("hub.verify_token")
+    challenge = request.args.get("hub.challenge")
+
+    if mode == "subscribe" and token == WEBHOOK_VERIFY_TOKEN:
+        logger.debug("Webhook verified successfully!")
+        return Response(challenge, status=200)
+    else:
+        logger.error("Webhook verification failed. Invalid token or mode.")
+        return Response(status=403)
+
+
+@app.post("/webhook")
+async def webhook(request: Request, background_tasks: BackgroundTasks):
+    try:
+        body = await request.json()
+
+        background_tasks.add_task(process_webhook_message, body)
+        return JSONResponse(content="success", status_code=200)
     except Exception as e:
         logger.error(f"Error processing webhook: {str(e)}")
         return JSONResponse(content=str(e), status_code=500)
