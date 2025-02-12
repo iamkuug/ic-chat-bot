@@ -58,8 +58,6 @@ async def webhook(request: Request):
     try:
         body = await request.json()
 
-        print(body)
-
         message = (
             body.get("entry", [{}])[0]
             .get("changes", [{}])[0]
@@ -68,7 +66,7 @@ async def webhook(request: Request):
         )
 
         if message.get("type") != "text":
-            return Response(content="", status_code=204)
+            return Response(content="", status_code=200)
 
         logger.debug(f"Incoming webhook message: {message}")
         user_message = message["text"]["body"]
