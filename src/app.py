@@ -57,6 +57,9 @@ def verify_webhook(request: Request):
 async def webhook(request: Request):
     try:
         body = await request.json()
+
+        print(body)
+
         message = (
             body.get("entry", [{}])[0]
             .get("changes", [{}])[0]
