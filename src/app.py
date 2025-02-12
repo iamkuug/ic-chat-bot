@@ -66,7 +66,7 @@ async def webhook(request: Request):
         )
 
         if message.get("type") != "text":
-            return Response(content="", status_code=200)
+            return Response(content="received, ignoring", status_code=200)
 
         logger.debug(f"Incoming webhook message: {message}")
         user_message = message["text"]["body"]
