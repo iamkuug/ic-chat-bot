@@ -5,34 +5,32 @@ from utils.logger import *
 gpt_client = OpenAI()
 
 
-async def add_response_to_thread(thread_id: str, message: str) -> None:
-    await gpt_client.beta.threads.messages.create(
+async def add_response_to_thread(thread_id: str, message: str):
+    res = await gpt_client.beta.threads.messages.create(
         thread_id=thread_id,
         role="user",
         content=message,
     )
 
+    return res 
+
 
 async def get_chatgpt_response(thread_id: str, assistant_id: str) -> str:
     try:
-        # Create run asynchronously
         run = await gpt_client.beta.threads.runs.create(
             thread_id=thread_id, assistant_id=assistant_id
         )
 
-        # Use exponential backoff and maximum retry logic
         max_attempts = 10
         base_delay = 1  # 1 second initial delay
 
         for attempt in range(max_attempts):
-            # Retrieve run status asynchronously
             run_status = await gpt_client.beta.threads.runs.retrieve(
                 thread_id=thread_id, run_id=run.id
             )
 
             if run_status.status == "completed":
                 logger.info("Run status complete - Generated reply!")
-                # Retrieve messages asynchronously
                 messages = await gpt_client.beta.threads.messages.list(
                     thread_id=thread_id
                 )
@@ -53,11 +51,9 @@ async def get_chatgpt_response(thread_id: str, assistant_id: str) -> str:
                 await asyncio.sleep(delay)
 
             else:
-                # Handle unexpected status
                 logger.warning(f"Unexpected run status: {run_status.status}")
                 await asyncio.sleep(1)
 
-        # If we've exhausted max attempts
         raise Exception("[Openai] Max retry attempts exceeded")
 
     except Exception as e:

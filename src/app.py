@@ -7,6 +7,7 @@ from utils.check_env_status import *
 from utils.logger import *
 from utils.openai import *
 from utils.wealth import *
+from utils.standardize_phone import *
 from constants import WEBHOOK_VERIFY_TOKEN, OPENAI_ASSISTANT_ID
 from redis.asyncio import Redis
 from dotenv import load_dotenv
@@ -47,6 +48,18 @@ async def process_webhook_message(body: dict):
         sender_phone_number = message["from"]
         message_id = message["id"]
 
+        number_is_blocked = await redis_client.sismember(
+            "blocked-numbers", sender_phone_number
+        )
+
+        print(number_is_blocked)
+
+        if number_is_blocked:
+            logger.debug(
+                f"User with number {sender_phone_number} is blocked, aborting ..."
+            )
+            return
+
         thread_key = f"thread:{sender_phone_number}"
         thread_id = await redis_client.get(thread_key)
 
@@ -85,9 +98,68 @@ async def process_webhook_message(body: dict):
 async def health():
     try:
         await redis_client.ping()
-        return {"status": "healthy", "redis": "connected"}, 200
+        return JSONResponse(
+            content={"status": "healthy", "redis": "connected"}, status_code=200
+        )
     except Exception as e:
-        return {"status": "unhealthy", "redis": str(e)}, 500
+        return JSONResponse(
+            content={"status": "unhealthy", "redis": "not connected"}, status_code=500
+        )
+
+
+@app.post("/api/block")
+async def block_number(request: Request):
+    try:
+        body = await request.json()
+        phone = body.get("phone")
+
+        if not phone:
+            return JSONResponse(
+                content={"message": "Field `phone` is required", "errors": []},
+                status_code=400,
+            )
+
+        phone = standardize_phone_number(phone)
+
+        not_blocked = await redis_client.sadd("blocked-numbers", phone)
+
+        if not not_blocked:
+            return JSONResponse(
+                content={"message": "Phone number already blocked", "errors": []},
+                status_code=200,
+            )
+
+        return JSONResponse(
+            content={"message": "Phone number successfully added", "errors": []},
+            status_code=200,
+        )
+    except Exception as e:
+        logger.error(f"Error processing request: {str(e)}")
+        return JSONResponse(
+            content={"message": f"Error processing request: {str(e)}", "errors": []},
+            status_code=500,
+        )
+
+
+@app.post("/api/clear-cache")
+async def clear_cache(request: Request):
+    try:
+        keys = await redis_client.keys(f"thread:*")
+
+        if not keys:
+            return JSONResponse(
+                content={"message": "Cache is already empty"}, status_code=200
+            )
+
+        deleted = await redis_client.delete(*keys)
+
+        return JSONResponse(
+            content={"message": "Cache successfully cleared", "errors": []},
+            status_code=200,
+        )
+    except Exception as e:
+        logger.error(f"Error processing request: {str(e)}")
+        return JSONResponse(content=str(e), status_code=500)
 
 
 @app.get("/webhook")
