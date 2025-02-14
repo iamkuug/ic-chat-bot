@@ -15,9 +15,6 @@ from typing import Optional
 import os
 import uvicorn
 
-load_dotenv()
-check_env_status()
-
 
 app = FastAPI()
 
@@ -93,6 +90,12 @@ async def process_webhook_message(body: dict):
 
     except Exception as e:
         logger.error(f"Error in background processing: {str(e)}")
+
+
+@app.on_event("startup")
+async def startup_event():
+    load_dotenv()
+    check_env_status()
 
 
 @app.get("/")
