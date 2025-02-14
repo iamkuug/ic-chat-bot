@@ -11,6 +11,7 @@ from utils.standardize_phone import *
 from constants import WEBHOOK_VERIFY_TOKEN, OPENAI_ASSISTANT_ID
 from redis.asyncio import Redis
 from dotenv import load_dotenv
+from typing import Optional
 import os
 import uvicorn
 
@@ -107,8 +108,35 @@ async def health():
         )
 
 
+@app.get("/api/blocked-list")
+async def get_blocked_numbers():
+    try:
+        blocked_numbers = await redis_client.smembers("blocked-numbers")
+
+        blocked_list = sorted(list(blocked_numbers))
+
+        return JSONResponse(
+            content={
+                "message": "Blocked numbers retrieved successfully",
+                "data": blocked_list,
+                "errors": [],
+            },
+            status_code=200,
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving blocked numbers: {str(e)}")
+        return JSONResponse(
+            content={
+                "message": f"Error retrieving blocked numbers: {str(e)}",
+                "errors": [],
+            },
+            status_code=500,
+        )
+
+
 @app.post("/api/block")
-async def block_number(request: Request):
+async def block_number(request: Request, unblock: Optional[bool] = None):
     try:
         body = await request.json()
         phone = body.get("phone")
@@ -121,18 +149,33 @@ async def block_number(request: Request):
 
         phone = standardize_phone_number(phone)
 
-        not_blocked = await redis_client.sadd("blocked-numbers", phone)
-
-        if not not_blocked:
+        if unblock:
+            # Handle unblock operation
+            removed = await redis_client.srem("blocked-numbers", phone)
+            if not removed:
+                return JSONResponse(
+                    content={"message": "Phone number was not blocked", "errors": []},
+                    status_code=200,
+                )
             return JSONResponse(
-                content={"message": "Phone number already blocked", "errors": []},
+                content={
+                    "message": "Phone number successfully unblocked",
+                    "errors": [],
+                },
+                status_code=200,
+            )
+        else:
+            not_blocked = await redis_client.sadd("blocked-numbers", phone)
+            if not not_blocked:
+                return JSONResponse(
+                    content={"message": "Phone number already blocked", "errors": []},
+                    status_code=200,
+                )
+            return JSONResponse(
+                content={"message": "Phone number successfully blocked", "errors": []},
                 status_code=200,
             )
 
-        return JSONResponse(
-            content={"message": "Phone number successfully added", "errors": []},
-            status_code=200,
-        )
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
         return JSONResponse(
